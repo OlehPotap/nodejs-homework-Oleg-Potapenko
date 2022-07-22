@@ -1,25 +1,89 @@
-const express = require('express')
+const express = require("express");
+const {
+  listContacts,
+  getContactById,
+  addContact,
+  removeContact,
+  updateContact,
+  updateStatusContact,
+} = require("../../contacts/contacts.service");
+const {
+  contactSchema,
+  updContactSchema,
+  schemaUpdateFavorite,
+} = require("../../contacts/contacts.schema");
+const {
+  serializeContactResponse,
+} = require("../../contacts/contacts.serializers");
+const { catchErrors } = require("../../shared/middlewares/catch-errors");
+const { validate } = require("../../shared/middlewares/validate");
+const { authorize } = require("../../shared/middlewares/autorize");
+const router = express.Router();
 
-const router = express.Router()
+router.get(
+  "/",
+  authorize(),
+  catchErrors(async (req, res, next) => {
+    const contacts = await listContacts(req.userId);
+    res.status(200).send(contacts);
+  })
+);
 
-router.get('/', async (req, res, next) => {
-  res.json({ message: 'template message' })
-})
+router.get(
+  "/:contactId",
+  authorize(),
+  catchErrors(async (req, res, next) => {
+    const contact = await getContactById(req.params.contactId, req.userId);
+    if (!contact) res.status(404).send({ message: "Not found" });
+    res.status(200).send(serializeContactResponse(contact));
+  })
+);
 
-router.get('/:contactId', async (req, res, next) => {
-  res.json({ message: 'template message' })
-})
+router.post(
+  "/",
+  authorize(),
+  validate(contactSchema),
+  catchErrors(async (req, res, next) => {
+    const contact = await addContact(req.body, req.userId);
+    res.status(201).send(contact);
+  })
+);
 
-router.post('/', async (req, res, next) => {
-  res.json({ message: 'template message' })
-})
+router.delete(
+  "/:contactId",
+  authorize(),
+  catchErrors(async (req, res, next) => {
+    const check = await getContactById(req.params.contactId, req.userId);
+    console.log(check);
+    if (!check) res.status(404).send({ message: "Not found" });
+    await removeContact(req.params.contactId);
+    res.status(200).send({ message: "contact deleted" });
+  })
+);
 
-router.delete('/:contactId', async (req, res, next) => {
-  res.json({ message: 'template message' })
-})
+router.put(
+  "/:contactId",
+  authorize(),
+  validate(updContactSchema),
+  catchErrors(async (req, res, next) => {
+    const check = await getContactById(req.params.contactId, req.userId);
+    if (!check) res.status(404).send({ message: "Not found" });
+    const contact = req.body;
+    await updateContact(req.params.contactId, req.body);
+    res.status(200).send(serializeContactResponse(contact));
+  })
+);
 
-router.put('/:contactId', async (req, res, next) => {
-  res.json({ message: 'template message' })
-})
+router.patch(
+  "/:contactId/favorite",
+  authorize(),
+  validate(schemaUpdateFavorite),
+  catchErrors(async (req, res, next) => {
+    const check = await getContactById(req.params.contactId, req.userId);
+    if (!check) res.status(404).send({ message: "Not found" });
+    const contact = await updateStatusContact(req.params.contactId, req.body);
+    res.status(200).send({ message: contact });
+  })
+);
 
-module.exports = router
+module.exports = router;
